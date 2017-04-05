@@ -18,7 +18,7 @@ function(mtx.assay, gene.list, num.cores = NULL,
 
         # Solve the trena problem using the supplied values and the ensemble solver
 
-        if(!(class(target.gene) == "try-error")){
+        if(!(class(gene.list$target.gene) == "try-error")){
             if(length(gene.list$target.gene$tfs) > 0){
 
                 solve(trena, target.gene, gene.list$target.gene$tfs, extraArgs = extraArgs)}
