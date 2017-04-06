@@ -12,11 +12,13 @@ sudo mount /scratch
 
 # istall latest version of R
 echo "deb http://ftp.osuosl.org/pub/cran/bin/linux/ubuntu trusty/" >> /etc/apt/sources.list
+#echo "deb http://ftp.osuosl.org/pub/cran/bin/linux/ubuntu xenial/" >> /etc/apt/sources.list
 apt-key adv --keyserver keyserver.ubuntu.com --recv-keys E084DAB9
 #echo "deb http://apt.postgresql.org/pub/repos/apt/ utopic-pgdg main" >> /etc/apt/sources.list
 #wget -q -O - https://www.postgresql.org/media/keys/ACCC4CF8.asc | sudo apt-key add -
 
 apt-get update && apt-get -y upgrade && apt-get -y install r-base postgresql postgresql-contrib awscli libcurl4-openssl-dev libxml2-dev libpq-dev libmariadbclient-dev && apt-get -qq install git
+#apt-get update && apt-get -y upgrade && apt-get -y install r-base postgresql postgresql-contrib awscli libcurl4-openssl-dev libxml2-dev libpq-dev libmariadb-client-lgpl-dev && apt-get -qq install git
 
 # Set up R environment
 R
