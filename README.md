@@ -11,14 +11,14 @@ echo "/dev/xvdba /scratch auto noatime 0 0" | sudo tee -a /etc/fstab
 sudo mount /scratch
 
 # istall latest version of R
-echo "deb http://ftp.osuosl.org/pub/cran/bin/linux/ubuntu trusty/" >> /etc/apt/sources.list
-#echo "deb http://ftp.osuosl.org/pub/cran/bin/linux/ubuntu xenial/" >> /etc/apt/sources.list
+#echo "deb http://ftp.osuosl.org/pub/cran/bin/linux/ubuntu trusty/" >> /etc/apt/sources.list
+echo "deb http://ftp.osuosl.org/pub/cran/bin/linux/ubuntu xenial/" >> /etc/apt/sources.list
 apt-key adv --keyserver keyserver.ubuntu.com --recv-keys E084DAB9
 #echo "deb http://apt.postgresql.org/pub/repos/apt/ utopic-pgdg main" >> /etc/apt/sources.list
 #wget -q -O - https://www.postgresql.org/media/keys/ACCC4CF8.asc | sudo apt-key add -
 
-apt-get update && apt-get -y upgrade && apt-get -y install r-base postgresql postgresql-contrib awscli libcurl4-openssl-dev libxml2-dev libpq-dev libmariadbclient-dev && apt-get -qq install git
-#apt-get update && apt-get -y upgrade && apt-get -y install r-base postgresql postgresql-contrib awscli libcurl4-openssl-dev libxml2-dev libpq-dev libmariadb-client-lgpl-dev && apt-get -qq install git
+#apt-get update && apt-get -y upgrade && apt-get -y install r-base postgresql postgresql-contrib awscli libcurl4-openssl-dev libxml2-dev libpq-dev libmariadbclient-dev && apt-get -qq install git
+apt-get update && apt-get -y upgrade && apt-get -y install r-base postgresql postgresql-contrib awscli libcurl4-openssl-dev libxml2-dev libpq-dev libmariadb-client-lgpl-dev && apt-get -qq install git
 
 # Set up R environment
 R
@@ -28,6 +28,21 @@ biocLite(c("glmnet", "GenomicRanges", "RSQLite", "lassopv", "randomForest", "fla
 q()
 n
 
+# specify s3 region 
+# this isn't right because I have s3 privleges but the region isn't specified
+aws configure
+us-west-2
+
+# try this next time
+vi ~/.aws/config
+echo "us-west-2" >> ~/.aws/config
+
+# get expression data
+mkdir -p /scratch/data
+cd /scratch/data
+aws s3 cp s3://cory-temp/gtex.primary2.rds .
+aws s3 cp s3://cory-temp/first100.RDS .
+
 # clone TReNA
 cd /scratch
 mkdir -p /scratch/github
@@ -35,15 +50,9 @@ cd /scratch/github/
 git clone https://github.com/PriceLab/TReNA.git
 cd /scratch/github/TReNA/
 R CMD INSTALL .
+aws s3 cp s3://cory-temp/coryGenomeScaleModel.R /scratch/github/TReNA/inst/utils/
 
-# specify s3 region 
-# this isn't right because I have s3 privleges but the region isn't specified
-aws configure
-us-west-2
-# get expression data
-mkdir -p /scratch/data
-cd /scratch/data
-aws s3 cp s3://cory-temp/gtex.pc.primary.rds .
+
 
 # get the sql databases
 mkdir -p /scratch/db
@@ -58,7 +67,12 @@ sudo /etc/init.d/postgresql stop
 mkdir -p /scratch/post
 rsync -av /var/lib/postgresql/ /scratch/post/
 # change default directory to /scratch/post/9.3/main/
-vi /etc/postgresql/9.3/main/postgresql.conf
+#sed -ie 's/var\/lib\/postgresql/scratch\/post/g' /etc/postgresql/9.3/main/postgresql.conf
+sed -ie 's/var\/lib\/postgresql/scratch\/post/g' /etc/postgresql/9.5/main/postgresql.conf
+
+# increase memory size and number of connections
+sed -ie 's/128MB/256MB/g' /etc/postgresql/9.5/main/postgresql.conf
+sed -ie 's/max_connections\ =\ 100/max_connections\ =\ 300/g' /etc/postgresql/9.5/main/postgresql.conf
 sudo /etc/init.d/postgresql start
 
 # set up postgres
@@ -70,6 +84,7 @@ CREATE DATABASE hg38;
 \q
 sudo pg_restore --verbose --clean --no-acl --no-owner --dbname=skin_hint --create skin_hint.dump &
 sudo pg_restore --verbose --clean --no-acl --no-owner --dbname=hg38 --create hg38.dump &
+
 wait
 sudo -u postgres psql postgres
 CREATE ROLE trena WITH SUPERUSER CREATEDB CREATEROLE LOGIN ENCRYPTED PASSWORD 'trena';
@@ -83,6 +98,7 @@ library(TReNA)
 library(doParallel)
 library(RPostgreSQL)
 source("/scratch/github/TReNA/inst/utils/createGenomeScaleModel.R")
+source("/scratch/github/TReNA/inst/utils/coryGenomeScaleModel.R")
 gtex.primary <- readRDS("/scratch/data/gtex.primary2.rds")
 gene.list <- rownames(gtex.primary)
 driver <- PostgreSQL()
@@ -94,7 +110,7 @@ genome.db <- dbConnect(driver, host=host, dbname=dbname, user=user, password=pas
 all.protein_coding.genes <- dbGetQuery(genome.db, "select gene_name from gtf where gene_biotype = 'protein_coding' and moleculetype = 'gene'")
 pc_gene.list <- gene.list[which(gene.list %in% all.protein_coding.genes$gene_name)]
 gtex.pc.primary <- gtex.primary[which(rownames(gtex.primary) %in% pc_gene.list),]
-
+first1000 <- readRDS("first1000.RDS")
 
 
 
