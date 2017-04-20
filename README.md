@@ -24,24 +24,16 @@ apt-get update && apt-get -y upgrade && apt-get -y install r-base postgresql pos
 R
 source("https://bioconductor.org/biocLite.R")
 library(BiocInstaller)
-biocLite(c("glmnet", "GenomicRanges", "RSQLite", "lassopv", "randomForest", "flare", "vbsr", "foreach", "doParallel", "RPostgreSQL", "RMySQL", "DBI"), ask=FALSE)
+biocLite(c("glmnet", "GenomicRanges", "RSQLite", "lassopv", "randomForest", "flare", "vbsr", "foreach", "doParallel", "RPostgreSQL", "RMySQL", "DBI", "RUnit", "BiocParallel"), ask=FALSE)
 q()
 n
-
-# specify s3 region 
-# this isn't right because I have s3 privleges but the region isn't specified
-aws configure
-us-west-2
-
-# try this next time
-vi ~/.aws/config
-echo "us-west-2" >> ~/.aws/config
 
 # get expression data
 mkdir -p /scratch/data
 cd /scratch/data
-aws s3 cp s3://cory-temp/gtex.primary2.rds .
-aws s3 cp s3://cory-temp/first100.RDS .
+#aws s3 cp s3://cory-temp/gtex.primary2.rds .
+aws s3 cp s3://cory-temp/gtex.fib.RData .
+#aws s3 cp s3://cory-temp/first100.RDS .
 
 # clone TReNA
 cd /scratch
@@ -51,8 +43,6 @@ git clone https://github.com/PriceLab/TReNA.git
 cd /scratch/github/TReNA/
 R CMD INSTALL .
 aws s3 cp s3://cory-temp/coryGenomeScaleModel.R /scratch/github/TReNA/inst/utils/
-
-
 
 # get the sql databases
 mkdir -p /scratch/db
@@ -81,15 +71,18 @@ sudo -u postgres psql postgres
 CREATE ROLE root WITH SUPERUSER CREATEDB CREATEROLE LOGIN ENCRYPTED PASSWORD 'trena';
 CREATE DATABASE skin_hint;
 CREATE DATABASE hg38;
+#CREATE DATABASE fimo;
 \q
 sudo pg_restore --verbose --clean --no-acl --no-owner --dbname=skin_hint --create skin_hint.dump &
 sudo pg_restore --verbose --clean --no-acl --no-owner --dbname=hg38 --create hg38.dump &
+#sudo pg_restore --verbose --clean --no-acl --no-owner --dbname=fimo --create fimo.dump &
 
 wait
 sudo -u postgres psql postgres
 CREATE ROLE trena WITH SUPERUSER CREATEDB CREATEROLE LOGIN ENCRYPTED PASSWORD 'trena';
 grant all privileges on database skin_hint to trena;
 grant all privileges on database hg38 to trena;
+#grant all privileges on database fimo to trena;
 \q
 
 # set up data in R
@@ -99,8 +92,9 @@ library(doParallel)
 library(RPostgreSQL)
 source("/scratch/github/TReNA/inst/utils/createGenomeScaleModel.R")
 source("/scratch/github/TReNA/inst/utils/coryGenomeScaleModel.R")
-gtex.primary <- readRDS("/scratch/data/gtex.primary2.rds")
-gene.list <- rownames(gtex.primary)
+#gtex.primary <- readRDS("/scratch/data/gtex.primary2.rds")
+load("gtex.fib.RData")
+gene.list <- rownames(gtex.fib)
 driver <- PostgreSQL()
 host <- "localhost"
 dbname <- "hg38"
@@ -109,8 +103,8 @@ password <- "trena"
 genome.db <- dbConnect(driver, host=host, dbname=dbname, user=user, password=password)
 all.protein_coding.genes <- dbGetQuery(genome.db, "select gene_name from gtf where gene_biotype = 'protein_coding' and moleculetype = 'gene'")
 pc_gene.list <- gene.list[which(gene.list %in% all.protein_coding.genes$gene_name)]
-gtex.pc.primary <- gtex.primary[which(rownames(gtex.primary) %in% pc_gene.list),]
-first1000 <- readRDS("first1000.RDS")
+gtex.pc.fib <- gtex.fib[which(rownames(gtex.fib) %in% pc_gene.list),]
+#first1000 <- readRDS("first1000.RDS")
 
 
 
