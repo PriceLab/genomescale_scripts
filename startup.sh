@@ -1,5 +1,13 @@
 #/bin/bash
 
+# mount ephemeral drive
+sudo -s
+
+sudo mkfs.ext4 /dev/xvdba
+sudo mkdir -m 000 /scratch 
+echo "/dev/xvdba /scratch auto noatime 0 0" | sudo tee -a /etc/fstab
+sudo mount /scratch
+
 # istall latest version of R
 #echo "deb http://ftp.osuosl.org/pub/cran/bin/linux/ubuntu trusty/" >> /etc/apt/sources.list
 echo "deb http://ftp.osuosl.org/pub/cran/bin/linux/ubuntu xenial/" >> /etc/apt/sources.list
