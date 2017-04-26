@@ -43,6 +43,7 @@ cd /scratch/db
 aws s3 cp s3://cory-dbtest/skin_hint.dump .
 aws s3 cp s3://cory-dbtest/hg38.dump .
 aws s3 cp s3://cory-dbtest/fimo.dump .
+aws s3 cp s3://cory-dbtest/03-28-2017-at-15-52-43_brain_hint.dump .
 
 # change the default location for postgres database storage
 # stoping postgres and changing the default directory to the scratch
@@ -67,11 +68,13 @@ CREATE ROLE root WITH SUPERUSER CREATEDB CREATEROLE LOGIN ENCRYPTED PASSWORD 'tr
 CREATE DATABASE skin_hint;
 CREATE DATABASE hg38;
 CREATE DATABASE fimo;
+CREATE DATABASE brain_hint;
 EOF
 
 sudo pg_restore --verbose --clean --no-acl --no-owner --dbname=skin_hint --create skin_hint.dump &
 sudo pg_restore --verbose --clean --no-acl --no-owner --dbname=hg38 --create hg38.dump &
 sudo pg_restore --verbose --clean --no-acl --no-owner --dbname=fimo --create fimo.dump &
+sudo pg_restore --verbose --clean --no-acl --no-owner --dbname=brain_hint --create 03-28-2017-at-15-52-43_brain_hint.dump &
 wait
 
 cd /scratch/db
@@ -80,4 +83,5 @@ CREATE ROLE trena WITH SUPERUSER CREATEDB CREATEROLE LOGIN ENCRYPTED PASSWORD 't
 grant all privileges on database skin_hint to trena;
 grant all privileges on database hg38 to trena;
 grant all privileges on database fimo to trena;
+grant all privileges on database brain_hint to trena;
 EOF
