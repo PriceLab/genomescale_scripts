@@ -25,6 +25,9 @@ cd /scratch/data
 #aws s3 cp s3://cory-temp/gtex.primary2.rds .
 aws s3 cp s3://cory-temp/gtex.fib.RData .
 #aws s3 cp s3://cory-temp/first100.RDS .
+mkdir -p /scratch/data/footprints
+cd /scratch/data/footprints
+asw s3 cp s3://cory-dbtest/footprints . --recursive
 
 cd /scratch
 mkdir -p /scratch/github
@@ -71,9 +74,10 @@ sudo pg_restore --verbose --clean --no-acl --no-owner --dbname=hg38 --create hg3
 sudo pg_restore --verbose --clean --no-acl --no-owner --dbname=fimo --create fimo.dump &
 wait
 
+cd /scratch/db
 sudo -u postgres psql postgres << EOF
 CREATE ROLE trena WITH SUPERUSER CREATEDB CREATEROLE LOGIN ENCRYPTED PASSWORD 'trena';
 grant all privileges on database skin_hint to trena;
 grant all privileges on database hg38 to trena;
-#grant all privileges on database fimo to trena;
+grant all privileges on database fimo to trena;
 EOF
