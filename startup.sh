@@ -39,6 +39,7 @@ mkdir -p /scratch/db
 cd /scratch/db
 aws s3 cp s3://cory-dbtest/skin_hint.dump .
 aws s3 cp s3://cory-dbtest/hg38.dump .
+aws s3 cp s3://cory-dbtest/fimo.dump .
 
 # change the default location for postgres database storage
 # stoping postgres and changing the default directory to the scratch
