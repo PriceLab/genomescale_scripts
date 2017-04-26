@@ -62,12 +62,12 @@ sudo -u postgres psql postgres << EOF
 CREATE ROLE root WITH SUPERUSER CREATEDB CREATEROLE LOGIN ENCRYPTED PASSWORD 'trena';
 CREATE DATABASE skin_hint;
 CREATE DATABASE hg38;
-#CREATE DATABASE fimo;
+CREATE DATABASE fimo;
 EOF
 
 sudo pg_restore --verbose --clean --no-acl --no-owner --dbname=skin_hint --create skin_hint.dump &
 sudo pg_restore --verbose --clean --no-acl --no-owner --dbname=hg38 --create hg38.dump &
-#sudo pg_restore --verbose --clean --no-acl --no-owner --dbname=fimo --create fimo.dump &
+sudo pg_restore --verbose --clean --no-acl --no-owner --dbname=fimo --create fimo.dump &
 wait
 
 sudo -u postgres psql postgres << EOF
