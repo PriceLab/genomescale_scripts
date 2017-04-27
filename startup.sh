@@ -27,7 +27,7 @@ aws s3 cp s3://cory-temp/gtex.fib.RData .
 #aws s3 cp s3://cory-temp/first100.RDS .
 mkdir -p /scratch/data/footprints
 cd /scratch/data/footprints
-asw s3 cp s3://cory-dbtest/footprints . --recursive
+aws s3 cp s3://cory-dbtest/footprints . --recursive
 
 cd /scratch
 mkdir -p /scratch/github
