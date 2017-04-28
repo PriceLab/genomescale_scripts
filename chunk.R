@@ -16,21 +16,21 @@ user <- "trena"
 password <- "trena"
 genome.db <- dbConnect(driver, host=host, dbname=dbname, user=user, password=password)
 
-gtex.pc.fib <- readRDS("/scratch/data/gtex.pc.fib.rds")
+mtx <- readRDS("/scratch/data/mtx/mayo.tcx.rds")
 
-list.1 <- rownames(gtex.pc.fib[start:stop,])
-system.time(fp <- stinkyFeet(gtex.pc.fib, list.1,
+list.1 <- rownames(mtx[start:stop,])
+system.time(fp <- stinkyFeet(mtx, list.1,
    "postgres://localhost/hg38",
-   "postgres://localhost/skin_hint",
+   "postgres://localhost/brain_hint",
    5000,
    5000,
-   num.cores = 64,
+   num.cores = 60,
    extraArgs = list("solver.list"=c("lasso", "ridge", "randomForest", "sqrtlasso", "lassopv", "pearson", "spearman"),
    "sqrtlasso"=list(num.cores=1))))
 
-system.time(test.fib.trn <- createSpecialModel(gtex.pc.fib, fp,
+system.time(trn <- createSpecialModel(mtx, fp,
  num.cores = 20,
  extraArgs = list("solver.list"=c("lasso", "ridge", "randomForest", "sqrtlasso", "lassopv", "pearson", "spearman"),
  "sqrtlasso"=list(num.cores=5))))
 
-saveRDS(test.fib.trn, name)
+saveRDS(trn, name)
