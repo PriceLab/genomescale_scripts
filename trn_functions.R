@@ -1,4 +1,5 @@
 # identify the top targets for a given TF, and give the TF rank relative to other TFs for the target gene.
+library(dplyr)
 
 addTFRank <- function(df, tf){
 
@@ -33,5 +34,6 @@ getTarget <- function(trn, geneA)
 # pull out the top targets for a given TF (without rank)
 getTF <- function(trn, geneA)
 {
-	subset(trn, gene == geneA)
+	temp <- subset(trn, gene == geneA)
+	temp[order(temp$pcaMax, decreasing=TRUE),]
 }
