@@ -176,16 +176,6 @@ getTfsFromAllDbs <- function(mtx.assay, gene.list, genome.db.uri, project.list,
     return(result.list)
 } # getTfsFromAllDbs
 #----------------------------------------------------------------------------------------------------
-# Commands to create variables for testing above
-library(TReNA);library(doParallel)
-mtx.assay <- as.matrix(readRDS("/scratch/data/mayo.tcx.rds"))
-gene.list <- head(rownames(mtx.assay))
-genome.db.uri <- "postgres://localhost/hg38"
-project.list <- c("postgres://localhost/brain_hint_16",
-                  "postgres://localhost/brain_hint_20")
-size.upstream <- 5000; size.downstream <- 5000; num.cores <-10
-
-#----------------------------------------------------------------------------------------------------
 createAverageModel <- function(mtx.assay, gene.list, num.cores = NULL,
                                    extraArgs = list()){
 
