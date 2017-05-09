@@ -9,26 +9,23 @@ start <- as.integer(args[4])
 stop <- as.integer(args[5])
 name <- args[6]
 
-driver <- PostgreSQL()
-host <- "localhost"
-dbname <- "hg38"
-user <- "trena"
-password <- "trena"
-genome.db <- dbConnect(driver, host=host, dbname=dbname, user=user, password=password)
+mtx <- as.matrix(readRDS("/scratch/data/mayo.cer.rds"))
 
-mtx <- readRDS("/scratch/data/mtx/mayo.tcx.rds")
+gene.list <- rownames(mtx[start:stop,])
 
-list.1 <- rownames(mtx[start:stop,])
-system.time(fp <- stinkyFeet(mtx, list.1,
-   "postgres://localhost/hg38",
-   "postgres://localhost/brain_hint",
-   5000,
-   5000,
-   num.cores = 60,
-   extraArgs = list("solver.list"=c("lasso", "ridge", "randomForest", "sqrtlasso", "lassopv", "pearson", "spearman"),
-   "sqrtlasso"=list(num.cores=1))))
+genome.db.uri <- "postgres://localhost/hg38"
+project.list <- c("postgres://localhost/brain_hint_16",
+    		"postgres://localhost/brain_hint_20",
+            	"postgres://localhost/brain_wellington_16",
+                "postgres://localhost/brain_wellington_20")
+size.downstream <- 5000
+size.upstream <- 5000   					
+num.cores <- 60
+system.time(fp <- getTfsFromAllDbs(mtx, gene.list, genome.db.uri, project.list, size.upstream, size.downstream, num.cores))
 
-system.time(trn <- createSpecialModel(mtx, fp,
+fp <- fp[lapply(fp,length)>0]
+
+system.time(trn <- createAverageModel(mtx, fp, 
  num.cores = 20,
  extraArgs = list("solver.list"=c("lasso", "ridge", "randomForest", "sqrtlasso", "lassopv", "pearson", "spearman"),
  "sqrtlasso"=list(num.cores=5))))
