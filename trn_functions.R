@@ -1,5 +1,7 @@
 # identify the top targets for a given TF, and give the TF rank relative to other TFs for the target gene.
 library(dplyr)
+library(data.table)
+
 
 addTFRank <- function(df, tf){
 
@@ -37,3 +39,28 @@ getTF <- function(trn, geneA)
 	temp <- subset(trn, gene == geneA)
 	temp[order(temp$pcaMax, decreasing=TRUE),]
 }
+
+#----------------------------------------------------------------------------
+
+# Function for pulling out genes + rank
+pullGeneAndRank <- function(my.gene,df){
+
+    df %>% filter(target.gene == my.gene) %>%
+    mutate(rank = rank(-pcaMax)) %>%
+    select(gene, rank)
+}
+
+# example of applying the function
+#gene.list <- scan("dev.genes", what="", sep="\n")
+
+#df.list <- lapply(gene.list, pullGeneAndRank, mtx.all)
+
+#all.df <- rbindlist(df.list)
+
+# Create summary statistics
+#final.df <- all.df %>% group_by(gene) %>%
+#summarise(frequency = n(), avg.rank = mean(rank), sd.rank = sd(rank),
+#top.rank = min(rank), bot.rank = max(rank)) %>%
+#arrange(desc(frequency),avg.rank)
+#final.df <- as.data.frame(final.df)
+#head(final.df, 30)
