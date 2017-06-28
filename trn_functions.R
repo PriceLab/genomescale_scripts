@@ -29,7 +29,8 @@ return(arrange(temp1, rank, desc(pcaMax)))
 
 getTarget <- function(trn, geneA)
 {
-	subset(trn, target.gene == geneA)
+	temp <- subset(trn, target.gene == geneA)
+	temp[order(temp$pcaMax, decreasing=TRUE),]
 }
 
 #----------------------------------------------------------------------------
