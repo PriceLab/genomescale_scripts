@@ -1,29 +1,9 @@
-# identify the top targets for a given TF, and give the TF rank relative to other TFs for the target gene.
+# Examples of how to explore genome-scale TRNs
+
 library(dplyr)
 library(data.table)
 
-
-addTFRank <- function(df, tf){
-
-extractRank <- function(df,my.target,tf){
-
-    blah <- df %>% filter(target.gene==my.target) %>% mutate(rank = rank(-pcaMax)) %>% filter(gene==tf) %>% select(rank)
-    blah$rank[[1]]
-}
-
-temp1 <- filter(df, gene==tf)
-temp1$rank <- NA
-for(i in 1:length(temp1$gene)){
-
-    temp1$rank[[i]] <- extractRank(df,
-                                      temp1$target.gene[[i]],
-                                      temp1$gene[[i]])
-}
-
-return(arrange(temp1, rank, desc(pcaMax)))
-
-}
-
+# functions to be used
 #---------------------------------------------------------------------------
 # pull out the top TFs for a given target gene
 
@@ -42,7 +22,14 @@ getTF <- function(trn, geneA)
 }
 
 #----------------------------------------------------------------------------
+# give a rank of each TF for the target gene
+trnTFRank <- function(trn)
+{
+trn <- data.frame(trn %>% group_by(target.gene) %>% mutate(Rank = rank(-pcaMax)))
+}
 
+#----------------------------------------------------------------------------
+# under the hood function
 # Function for pulling out genes + rank
 pullGeneAndRank <- function(my.gene,df){
 
@@ -51,17 +38,41 @@ pullGeneAndRank <- function(my.gene,df){
     select(gene, rank)
 }
 
-# example of applying the function
-#gene.list <- scan("dev.genes", what="", sep="\n")
-
-#df.list <- lapply(gene.list, pullGeneAndRank, mtx.all)
-
-#all.df <- rbindlist(df.list)
+#----------------------------------------------------------------------------
+# function that takes a list of genes to see what TFs are top regulators
+tfEnrich <- function(trn, gene.list)
+{
+df.list <- lapply(gene.list, pullGeneAndRank, trn)
+all.df <- rbindlist(df.list)
 
 # Create summary statistics
-#final.df <- all.df %>% group_by(gene) %>%
-#summarise(frequency = n(), avg.rank = mean(rank), sd.rank = sd(rank),
-#top.rank = min(rank), bot.rank = max(rank)) %>%
-#arrange(desc(frequency),avg.rank)
-#final.df <- as.data.frame(final.df)
-#head(final.df, 30)
+final.df <- all.df %>% group_by(gene) %>%
+summarise(frequency = n(), avg.rank = mean(rank), sd.rank = sd(rank),
+top.rank = min(rank), bot.rank = max(rank)) %>%
+arrange(desc(frequency),avg.rank)
+final.df <- as.data.frame(final.df)
+arrange(head(final.df, 50), avg.rank)
+}
+
+#----------------------------------------------------------------------------
+# load the data
+skin <- readRDS("primary.trn.rds")
+fibro <- readRDS("fibroblast.trn.rds")
+gene.list <- scan("ecm_list2", what="", sep="\n")
+
+#----------------------------------------------------------------------------
+# add ranks to the data
+skin <- trnTFRank(skin)
+fibro <- trnTFRank(fibro)
+
+# pull out the top regulators of COL1A1
+getTarget(skin, "COL1A1")
+
+# pull out the top targets of CREB3L1 (get rid of everything after the pipe (%>% if you don't want a full list)
+getTF(skin, "CREB3L1") %>% filter(Rank <= 3)
+
+# check a list of ECM genes to see which TFs drive expression
+tfEnrich(skin, gene.list)
+
+# get the CREB3L1 targets that are in the ecm gene list
+getTF(skin, "CREB3L1") %>% filter(target.gene %in% gene.list) %>% filter(Rank <= 3)
