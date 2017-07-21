@@ -35,7 +35,7 @@ pullGeneAndRank <- function(my.gene,df){
 
     df %>% filter(target.gene == my.gene) %>%
     mutate(rank = rank(-pcaMax)) %>%
-    select(gene, rank)
+    dplyr::select(gene, rank)
 }
 
 #----------------------------------------------------------------------------
