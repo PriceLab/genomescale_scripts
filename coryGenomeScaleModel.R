@@ -1,9 +1,9 @@
 createGenomeScaleModel <- function(mtx.assay, gene.list, genome.db.uri, project.db.uri,
                                    size.upstream=1000, size.downstream=1000, num.cores = NULL,
-                                   extraArgs = list()){
+                                   solverNames){
 
     footprint.filter <- FootprintFilter(mtx.assay = mtx.assay)
-    trena <- TReNA(mtx.assay, solver = "ensemble")
+    
 
     lapply(dbListConnections(dbDriver(drv="PostgreSQL")), dbDisconnect)
 
@@ -29,8 +29,12 @@ createGenomeScaleModel <- function(mtx.assay, gene.list, genome.db.uri, project.
 
         if(!(class(out.list) == "try-error")){
             if(length(out.list$tfs) > 0){
-                
-                solve(trena, target.gene, out.list$tfs, extraArgs = extraArgs)}
+                trena <- EnsembleSolver(mtx.assay, 
+					targetGene = target.gene,
+					candidateRegulators = out.list$tfs, 
+				       solverNames = solverNames,
+				       nCores.sqrt = num.cores)
+                solve(trena)}
             
             else{NULL}
 
