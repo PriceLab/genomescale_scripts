@@ -1,29 +1,32 @@
+library(trena)
+library(BiocParallel)
+#----------------------------------------------------------------------------------------------------
 createGenomeScaleModel <- function(mtx.assay, gene.list, genome.db.uri, project.db.uri,
                                    size.upstream=1000, size.downstream=1000, num.cores = NULL,
                                    solverNames){
-
-    footprint.filter <- FootprintFilter(mtx.assay = mtx.assay)
     
-
     lapply(dbListConnections(dbDriver(drv="PostgreSQL")), dbDisconnect)
 
     # Setup the parallel structure with a default of half the cores
     if(is.null(num.cores)){
-        num.cores <- detectCores()/2}  
+        num.cores <- detectCores()/2}
+    
+    
     cl <- makeForkCluster(nnodes = num.cores)
     registerDoParallel(cl)
     
     full.result.list <- foreach(i = 1:length(gene.list), .packages='TReNA') %dopar% {
 	
 	# Designate the target gene and grab the tfs
-        target.gene <- gene.list[[i]]        
-        out.list <- try(getCandidates(footprint.filter,extraArgs = list(
-                                                  "target.gene" = target.gene,
-                                                  "genome.db.uri" = genome.db.uri,
-                                                  "project.db.uri" = project.db.uri,
-                                                  "size.upstream" = size.upstream,                                          
-                                                  "size.downstream" = size.downstream)),
-                        silent = TRUE)
+        target.gene <- gene.list[[i]]
+        footprint.filter <- FootprintFilter(genomeDB = genome.db.uri,                                            
+                                            footprintDB = project.db.uri,                                            
+                                            geneCenteredSpec = list(targetGene = target.gene,
+                                                                    tssUpstream = 1000,
+                                                                    tssDownstream = 1000),
+                                            regionsSpec = list())
+        
+        out.list <- try(getCandidates(footprint.filter),silent = TRUE)
 	
         # Solve the trena problem using the supplied values and the ensemble solver
 
@@ -32,13 +35,11 @@ createGenomeScaleModel <- function(mtx.assay, gene.list, genome.db.uri, project.
                 trena <- EnsembleSolver(mtx.assay, 
 					targetGene = target.gene,
 					candidateRegulators = out.list$tfs, 
-				       solverNames = solverNames,
-				       nCores.sqrt = num.cores)
-                solve(trena)}
-            
-            else{NULL}
-
-            
+                                        solverNames = solverNames,                                        
+                                        nCores.sqrt = num.cores)                
+                solve(trena)
+            }            
+            else{NULL}            
         }
         else{NULL}
 }
@@ -98,6 +99,8 @@ createSpecialModel <- function(mtx.assay, gene.list, num.cores = NULL,
     # Setup the parallel structure with a default of half the cores
     if(is.null(num.cores)){
         num.cores <- detectCores()/2}
+
+    
     cl <- makePSOCKcluster(num.cores)
     registerDoParallel(cl)
 
