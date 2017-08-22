@@ -1,8 +1,14 @@
 library(trena)
 library(BiocParallel)
 #----------------------------------------------------------------------------------------------------
-createGenomeScaleModel <- function(mtx.assay, gene.list, genome.db.uri, project.db.uri,
-                                   size.upstream=1000, size.downstream=1000, num.cores = NULL,
+createGenomeScaleModel <- function(mtx.assay,
+                                   gene.list,
+                                   genome.db.uri,
+                                   project.db.uri,
+                                   size.upstream=1000,
+                                   size.downstream=1000,
+                                   num.cores = NULL,
+                                   nCores.sqrt = 4,
                                    solverNames){
     
     lapply(dbListConnections(dbDriver(drv="PostgreSQL")), dbDisconnect)
@@ -10,45 +16,50 @@ createGenomeScaleModel <- function(mtx.assay, gene.list, genome.db.uri, project.
     # Setup the parallel structure with a default of half the cores
     if(is.null(num.cores)){
         num.cores <- detectCores()/2}
-    
-    
-    cl <- makeForkCluster(nnodes = num.cores)
-    registerDoParallel(cl)
-    
-    full.result.list <- foreach(i = 1:length(gene.list), .packages='TReNA') %dopar% {
-	
-	# Designate the target gene and grab the tfs
-        target.gene <- gene.list[[i]]
-        footprint.filter <- FootprintFilter(genomeDB = genome.db.uri,                                            
-                                            footprintDB = project.db.uri,                                            
+
+    # Use BiocParallel
+    register(MulticoreParam(workers = num.cores,
+                            stop.on.error = FALSE,
+                            log = TRUE),
+             default = TRUE)
+
+    # Make the model-creation into a function
+    createGeneModel <- function(target.gene, mtx.assay, genome.db.uri, project.db.uri,
+                                size.upstream, size.downstream, solverNames){
+
+        # Create the footprint filter and get candidates with it
+        footprint.filter <- FootprintFilter(genomeDB = genome.db.uri,
+                                            footprintDB = project.db.uri,                                          
                                             geneCenteredSpec = list(targetGene = target.gene,
-                                                                    tssUpstream = 1000,
-                                                                    tssDownstream = 1000),
-                                            regionsSpec = list())
-        
+                                                                    tssUpstream = size.upstream,
+                                                                    tssDownstream = size.downstream),
+                                            regionsSpec = list())        
         out.list <- try(getCandidates(footprint.filter),silent = TRUE)
 	
         # Solve the trena problem using the supplied values and the ensemble solver
-
         if(!(class(out.list) == "try-error")){
             if(length(out.list$tfs) > 0){
                 trena <- EnsembleSolver(mtx.assay, 
 					targetGene = target.gene,
 					candidateRegulators = out.list$tfs, 
                                         solverNames = solverNames,                                        
-                                        nCores.sqrt = num.cores)                
-                solve(trena)
+                                        nCores.sqrt = nCores.sqrt)                
+                return(solve(trena))
             }            
-            else{NULL}            
+            else{return(NULL)}            
         }
-        else{NULL}
-}
-    # Stop the cluster
-    stopCluster(cl)
-    
-    # Name the list after the genes supplied
-    names(full.result.list) <- gene.list
-    return(full.result.list)
+        else{return(NULL)}                
+    }
+
+    # Run the function for the gene list using bplapply
+    result <- bplapply(gene.list, createGeneModel,
+                       mtx.assay = mtx.assay,
+                       genome.db.uri = genome.db.uri,
+                       project.db.uri = project.db.uri,                       
+                       size.upstream = size.upstream,                       
+                       size.downstream = size.downstream,                       
+                       solverNames = solverNames)
+    return(result)
 
 } # createGenomeScaleModel
 #----------------------------------------------------------------------------------------------------
