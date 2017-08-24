@@ -1,5 +1,6 @@
 library(trena)
 library(BiocParallel)
+library(RPostgreSQL)
 #----------------------------------------------------------------------------------------------------
 createGenomeScaleModel <- function(mtx.assay,
                                    gene.list,
@@ -35,7 +36,7 @@ createGenomeScaleModel <- function(mtx.assay,
                                                                     tssDownstream = size.downstream),
                                             regionsSpec = list())        
         out.list <- try(getCandidates(footprint.filter),silent = TRUE)
-	
+
         # Solve the trena problem using the supplied values and the ensemble solver
         if(!(class(out.list) == "try-error")){
             if(length(out.list$tfs) > 0){
@@ -64,10 +65,7 @@ createGenomeScaleModel <- function(mtx.assay,
 } # createGenomeScaleModel
 #----------------------------------------------------------------------------------------------------
 stinkyFeet <- function(mtx.assay, gene.list, genome.db.uri, project.db.uri,
-                                   size.upstream=1000, size.downstream=1000, num.cores = NULL,
-                                   extraArgs = list()){
-
-    footprint.filter <- FootprintFilter(mtx.assay = mtx.assay)
+                       size.upstream=1000, size.downstream=1000, num.cores = NULL){
 
     # Setup the parallel structure with a default of half the cores
     if(is.null(num.cores)){
@@ -75,19 +73,22 @@ stinkyFeet <- function(mtx.assay, gene.list, genome.db.uri, project.db.uri,
     cl <- makeForkCluster(nnodes = num.cores)
     registerDoParallel(cl)
 
-    full.result.list <- foreach(i = 1:length(gene.list), .packages='TReNA', .errorhandling="pass") %dopar% {
+    full.result.list <- foreach(i = 1:length(gene.list), .packages='trena', .errorhandling="pass") %dopar% {
 	
 	Sys.sleep(runif(1, 0, 10))
         # Designate the target gene and grab the tfs
         target.gene <- gene.list[[i]]
-        out.list <- try(getCandidates(footprint.filter,extraArgs = list(
-                                                  "target.gene" = target.gene,
-                                                  "genome.db.uri" = genome.db.uri,
-                                                  "project.db.uri" = project.db.uri,
-                                                  "size.upstream" = size.upstream,
-                                                  "size.downstream" = size.downstream)),
-                        silent = TRUE)
-	return(out.list$tfs)
+
+        footprint.filter <- FootprintFilter(genomeDB = genome.db.uri,
+                                            footprintDB = project.db.uri,                                          
+                                            geneCenteredSpec = list(targetGene = target.gene,
+                                                                    tssUpstream = size.upstream,
+                                                                    tssDownstream = size.downstream),
+                                            regionsSpec = list())        
+
+        out.list <- try(getCandidates(footprint.filter, silent = TRUE))
+        if(!(class(out.list) == "try-error")){
+           return(out.list$tfs)} else{return("Sandwich")}
 	}
         # Solve the trena problem using the supplied values and the ensemble solver
 
