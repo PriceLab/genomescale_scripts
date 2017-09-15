@@ -64,42 +64,59 @@ createGenomeScaleModel <- function(mtx.assay,
 
 } # createGenomeScaleModel
 #----------------------------------------------------------------------------------------------------
-stinkyFeet <- function(mtx.assay, gene.list, genome.db.uri, project.db.uri,
-                       size.upstream=1000, size.downstream=1000, num.cores = NULL){
+getTfsFromDb <- function(gene.list, genome.db.uri, project.db.uri,
+                       size.upstream=1000, size.downstream=1000, num.cores = 8){
 
     # Setup the parallel structure with a default of half the cores
     if(is.null(num.cores)){
         num.cores <- detectCores()/2}
-    cl <- makeForkCluster(nnodes = num.cores)
-    registerDoParallel(cl)
 
-    full.result.list <- foreach(i = 1:length(gene.list), .packages='trena', .errorhandling="pass") %dopar% {
-	
-	Sys.sleep(runif(1, 0, 10))
-        # Designate the target gene and grab the tfs
-        target.gene <- gene.list[[i]]
+    # Use BiocParallel    
+    register(MulticoreParam(workers = num.cores,
+    #register(SerialParam(    
 
-        footprint.filter <- FootprintFilter(genomeDB = genome.db.uri,
-                                            footprintDB = project.db.uri,                                          
-                                            geneCenteredSpec = list(targetGene = target.gene,
-                                                                    tssUpstream = size.upstream,
-                                                                    tssDownstream = size.downstream),
-                                            regionsSpec = list())        
+                            stop.on.error = FALSE,                            
+                            log = TRUE),
+             default = TRUE)
 
-        out.list <- try(getCandidates(footprint.filter, silent = TRUE))
-        if(!(class(out.list) == "try-error")){
-           return(out.list$tfs)} else{return("Sandwich")}
-	}
-        # Solve the trena problem using the supplied values and the ensemble solver
+    findGeneFootprints <- function(target.gene, genome.db.uri, project.db.uri,
+                                   size.upstream, size.downstream){
 
-    # Stop the cluster
-    stopCluster(cl)
+        # Create the footprint filter from the target gene
+        footprint.filter <- try(FootprintFilter(genomeDB = genome.db.uri,
+                                                footprintDB = project.db.uri,
+                                                geneCenteredSpec = list(targetGene = target.gene,
+                                                                        tssUpstream = size.upstream,
+                                                                        tssDownstream = size.downstream),
+                                                regionsSpec = list()),                                
+                                silent = TRUE)
 
+        # Only grab candidates if the filter is valid
+        if(class(footprint.filter) == "FootprintFilter"){
+            out.list <- getCandidates(footprint.filter)
+
+            # Only return TFs if candidate grab is not null
+            if(class(out.list) != "NULL"){                
+                return(out.list$tfs)
+            } else {
+                return("No Candidates Found")
+                }                
+        } else{            
+            return(footprint.filter[1])
+            }
+    }    
+
+    full.result.list <- bplapply(gene.list, findGeneFootprints,
+                                 genome.db.uri = genome.db.uri,
+                                 project.db.uri = project.db.uri,
+                                 size.upstream = size.upstream,
+                                 size.downstream = size.downstream)
+    
     # Name the list after the genes supplied
     names(full.result.list) <- gene.list
     return(full.result.list)
 
-} # stinkyFeet
+} # getTfsFromDb
 #------------------------------------------------------------------------------------------------------
 createSpecialModel <- function(mtx.assay, gene.list, num.cores = NULL,
                                    extraArgs = list()){
@@ -231,3 +248,49 @@ createAverageModel <- function(mtx.assay, gene.list, num.cores = NULL,
     return(full.result.list)
 
 } # createAverageModel
+#----------------------------------------------------------------------------------------------------
+createModelFromGeneList <- function(mtx.assay, gene.list, num.cores = NULL,
+                                    solverList = c("lasso","ridge"),
+                                    nCores.sqrt = 2){
+
+    # Remove genes from the list that don't have any TFs
+    rm.idx <- which(sapply(gene.list,length) == 1)
+    gene.list[rm.idx] <- NULL
+    
+    # Create parallel structure w/ BiocParallel
+    register(MulticoreParam(workers = num.cores,                            
+                            stop.on.error = FALSE,                            
+                            log = TRUE),             
+             default = TRUE)
+
+
+    # Create a function that:
+    # 1) Takes a Named List (name = target.gene, list = regulators)
+    # 2) Creates an ensemble solver with the prescribed solvers
+    # 3) Solves the solver
+
+    buildAndSolveForGene <- function(idx,gene.list, mtx.assay, solverList, nCores.sqrt){
+
+        # Build the ensemble solver
+        e.solver <- EnsembleSolver(mtx.assay = mtx.assay,
+                                   targetGene = names(gene.list)[idx],
+                                   candidateRegulators = gene.list[[idx]],
+                                   solverNames = solverList,
+                                   nCores.sqrt = nCores.sqrt)
+        # Solve the ensemble solver
+        return(run(e.solver))
+        }
+
+    full.result.list <- bptry(bplapply(1:length(gene.list), buildAndSolveForGene,
+                                       gene.list = gene.list,
+                                       mtx.assay = mtx.assay,
+                                       solverList = solverList,
+                                       nCores.sqrt = nCores.sqrt
+                                       )
+                              )
+    # Name the list after the genes supplied
+    names(full.result.list) <- names(gene.list)
+    return(full.result.list)
+
+} # createModelFromGeneList
+#----------------------------------------------------------------------------------------------------
