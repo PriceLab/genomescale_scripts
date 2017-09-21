@@ -62,17 +62,17 @@ gene.list <- scan("ecm_list2", what="", sep="\n")
 
 #----------------------------------------------------------------------------
 # add ranks to the data
-skin <- trnTFRank(skin)
-fibro <- trnTFRank(fibro)
+#skin <- trnTFRank(skin)
+#fibro <- trnTFRank(fibro)
 
 # pull out the top regulators of COL1A1
-getTarget(skin, "COL1A1")
+#getTarget(skin, "COL1A1")
 
 # pull out the top targets of CREB3L1 (get rid of everything after the pipe (%>% if you don't want a full list)
-getTF(skin, "CREB3L1") %>% filter(Rank <= 3)
+#getTF(skin, "CREB3L1") %>% filter(Rank <= 3)
 
 # check a list of ECM genes to see which TFs drive expression
-tfEnrich(skin, gene.list)
+#tfEnrich(skin, gene.list)
 
 # get the CREB3L1 targets that are in the ecm gene list
-getTF(skin, "CREB3L1") %>% filter(target.gene %in% gene.list) %>% filter(Rank <= 3)
+#getTF(skin, "CREB3L1") %>% filter(target.gene %in% gene.list) %>% filter(Rank <= 3)
