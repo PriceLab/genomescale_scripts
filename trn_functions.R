@@ -56,9 +56,9 @@ arrange(head(final.df, 50), avg.rank)
 
 #----------------------------------------------------------------------------
 # load the data
-skin <- readRDS("primary.trn.rds")
-fibro <- readRDS("fibroblast.trn.rds")
-gene.list <- scan("ecm_list2", what="", sep="\n")
+#skin <- readRDS("primary.trn.rds")
+#fibro <- readRDS("fibroblast.trn.rds")
+#gene.list <- scan("ecm_list2", what="", sep="\n")
 
 #----------------------------------------------------------------------------
 # add ranks to the data
