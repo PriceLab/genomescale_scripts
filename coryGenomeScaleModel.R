@@ -413,9 +413,7 @@ getTfsFromSampleIDsMultiDB <- function(gene.list, sampleIDs, genome.db.uri, proj
         }
         # Return the full list
         return(all.tfs)
-    }
-    
-    
+    }        
     
     # This part should remain the same
     full.result.list <- bplapply(gene.list, combineTFsFromDBs,
@@ -431,3 +429,95 @@ getTfsFromSampleIDsMultiDB <- function(gene.list, sampleIDs, genome.db.uri, proj
 
 } # getTfsFromSampleIDsMultiDB
 #----------------------------------------------------------------------------------------------------
+getTfsFromMultiDB <- function(gene.list, genome.db.uri, projectList,
+                                size.upstream=1000, size.downstream=1000, num.cores = 8){
+
+    # Setup the parallel structure with a default of half the cores
+    if(is.null(num.cores)){
+        num.cores <- detectCores()/2}
+
+    # Use BiocParallel    
+    register(MulticoreParam(workers = num.cores,
+    #register(SerialParam(    
+
+                            stop.on.error = FALSE,                            
+                            log = TRUE),
+             default = TRUE)
+
+    findGeneFootprints <- function(target.gene, genome.db.uri, project.db.uri,
+                                   size.upstream, size.downstream){
+        
+        # Create the footprint filter from the target gene
+        footprint.filter <- try(FootprintFilter(genomeDB = genome.db.uri,                                                
+                                                footprintDB = project.db.uri,                                             
+                                                geneCenteredSpec = list(targetGene = target.gene,
+                                                                        tssUpstream = size.upstream,
+                                                                        tssDownstream = size.downstream),
+                                                regionsSpec = list()),                                
+                                silent = TRUE)                    
+        # Only grab candidates if the filter is valid        
+        if(class(footprint.filter) == "FootprintFilter"){            
+            out.list <- getCandidates(footprint.filter)                            
+            # Only return TFs if candidate grab is not null            
+            if(class(out.list) != "NULL"){                                    
+                return(out.list$tfs)                
+            } else {                
+                return("No Candidates Found")                
+            }            
+        } else{            
+            return("Cannot create filter")            
+        }        
+    }
+
+    # Define a function that loops through a list and accumulates TF lists
+    combineTFsFromDBs <- function(target.gene, genome.db.uri, projectList,
+                                  size.upstream, size.downstream){
+
+        # Create an empty vector
+        all.tfs <- character(0)
+
+        # Find Footprints from each DB and add to list
+        for(project.db.uri in projectList){
+            new.tfs <- findGeneFootprints(target.gene, genome.db.uri, project.db.uri,
+                                          size.upstream, size.downstream)
+            all.tfs <- union(all.tfs, new.tfs)
+        }
+        # Return the full list
+        return(all.tfs)
+    }        
+    
+    # This part should remain the same
+    full.result.list <- bplapply(gene.list, combineTFsFromDBs,
+                                 genome.db.uri = genome.db.uri,
+                                 projectList = projectList,
+                                 size.upstream = size.upstream,
+                                 size.downstream = size.downstream,
+                                 sampleIDs = sampleIDs)
+    
+    # Name the list after the genes supplied
+    names(full.result.list) <- gene.list
+    return(full.result.list)
+
+} # getTfsFromSampleIDsMultiDB
+#----------------------------------------------------------------------------------------------------
+# Example Cory Script
+# Assume my.mtx is the matrix, hg38 is the genome.db, brain is the tissue, shoulder is 5000
+
+# Also assume this has 128 cores!!
+# Step 1: Get all the genes
+all.genes <- getTfsFromMultiDB(rownames(my.mtx),
+                               genome.db.uri = "postgres://localhost/hg38",
+                               projectList = c("postgres://localhost/brain_hint_20",
+                                               "postgres://localhost/brain_hint_16",
+                                               "postgres://localhost/brain_wellington_20",
+                                               "postgres://localhost/brain_wellington_16"),
+                               size.upstream = 5000,
+                               size.downstream = 5000,
+                               num.cores = 100)
+
+# Step 2: Use all the genes to make ALL the models
+all.models <- createModelFromGeneList(my.mtx, all.genes, num.cores = 30,
+                                      solverList = c("lasso","ridge","pearson",
+                                                     "spearman","randomforest",
+                                                     "lassopv","sqrtlasso"),
+                                      nCores.sqrt = 4)
