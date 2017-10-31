@@ -3,6 +3,9 @@ library(BiocParallel)
 library(RPostgreSQL)
 library(dplyr)
 #----------------------------------------------------------------------------------------------------
+# Bring in the TF-motif mapping
+motifsgenes <- readRDS("./2017_10_26_Motif_TF_Map.RDS")
+#----------------------------------------------------------------------------------------------------
 createGenomeScaleModel <- function(mtx.assay,
                                    gene.list,
                                    genome.db.uri,
@@ -83,22 +86,33 @@ getTfsFromDb <- function(gene.list, genome.db.uri, project.db.uri,
     findGeneFootprints <- function(target.gene, genome.db.uri, project.db.uri,
                                    size.upstream, size.downstream){
 
+        # Use the target gene to get the correct regions
+        trena <- Trena("hg38")
+        regions <- getProximalPromoter(trena, target.gene, size.upstream, size.downstream)
+
+        # Check if there IS a proximal promoter; if not, return "No proximal promoter"
+        if(is.na(regions)) return("No promoter found")
+        
         # Create the footprint filter from the target gene
         footprint.filter <- try(FootprintFilter(genomeDB = genome.db.uri,
                                                 footprintDB = project.db.uri,
-                                                geneCenteredSpec = list(targetGene = target.gene,
-                                                                        tssUpstream = size.upstream,
-                                                                        tssDownstream = size.downstream),
-                                                regionsSpec = list()),                                
-                                silent = TRUE)
+                                                regions = regions),                                
+                                silent = TRUE)        
 
         # Only grab candidates if the filter is valid
         if(class(footprint.filter) == "FootprintFilter"){
             out.list <- getCandidates(footprint.filter)
 
+            # Catch empty data frames
+            if(nrow(out.list) == 0) return(character(0))
+
             # Only return TFs if candidate grab is not null
-            if(class(out.list) != "NULL"){                
-                return(out.list$tfs)
+            if(class(out.list) != "NULL"){
+                # Use a semi join to grab the correct tfs
+                tf.df <- motifsgenes %>%
+                    semi_join(out.list, by = c("motif" = "motifName"))
+                return(unique(tf.df$tf))
+
             } else {
                 return("No Candidates Found")
                 }                
@@ -438,47 +452,58 @@ getTfsFromMultiDB <- function(gene.list, genome.db.uri, projectList,
 
     # Use BiocParallel    
     register(MulticoreParam(workers = num.cores,
-    #register(SerialParam(    
-
                             stop.on.error = FALSE,                            
                             log = TRUE),
              default = TRUE)
 
-    findGeneFootprints <- function(target.gene, genome.db.uri, project.db.uri,
+    findGeneFootprints <- function(regions, genome.db.uri, project.db.uri,
                                    size.upstream, size.downstream){
-        
+                
         # Create the footprint filter from the target gene
-        footprint.filter <- try(FootprintFilter(genomeDB = genome.db.uri,                                                
-                                                footprintDB = project.db.uri,                                             
-                                                geneCenteredSpec = list(targetGene = target.gene,
-                                                                        tssUpstream = size.upstream,
-                                                                        tssDownstream = size.downstream),
-                                                regionsSpec = list()),                                
-                                silent = TRUE)                    
-        # Only grab candidates if the filter is valid        
-        if(class(footprint.filter) == "FootprintFilter"){            
-            out.list <- getCandidates(footprint.filter)                            
-            # Only return TFs if candidate grab is not null            
-            if(class(out.list) != "NULL"){                                    
-                return(out.list$tfs)                
-            } else {                
-                return("No Candidates Found")                
-            }            
+        footprint.filter <- try(FootprintFilter(genomeDB = genome.db.uri,
+                                                footprintDB = project.db.uri,
+                                                regions = regions),                                
+                                silent = TRUE)        
+        
+        # Only grab candidates if the filter is valid
+        if(class(footprint.filter) == "FootprintFilter"){
+            out.list <- getCandidates(footprint.filter)
+            
+            # Only return TFs if candidate grab is not null
+            if(class(out.list) != "NULL"){
+
+                # Catch empty data frames
+                if(nrow(out.list) == 0) return(character(0))
+                # Use a semi join to grab the correct tfs
+                tf.df <- motifsgenes %>%
+                    semi_join(out.list, by = c("motif" = "motifName"))
+                return(unique(tf.df$tf))                
+            } else {
+                return("No Candidates Found")
+            }                
         } else{            
-            return("Cannot create filter")            
-        }        
-    }
+            return(footprint.filter[1])
+        }
+    }    
 
     # Define a function that loops through a list and accumulates TF lists
     combineTFsFromDBs <- function(target.gene, genome.db.uri, projectList,
                                   size.upstream, size.downstream){
+
+        # Look for the regions first
+        trena <- Trena("hg38")
+        regions <- getProximalPromoter(trena, target.gene, size.upstream, size.downstream)
+        
+        # Check if there IS a proximal promoter; if not, return "No proximal promoter"
+        # By doing this here, we're saving time!
+        if(is.na(regions)) return("No promoter found")
 
         # Create an empty vector
         all.tfs <- character(0)
 
         # Find Footprints from each DB and add to list
         for(project.db.uri in projectList){
-            new.tfs <- findGeneFootprints(target.gene, genome.db.uri, project.db.uri,
+            new.tfs <- findGeneFootprints(regions, genome.db.uri, project.db.uri,
                                           size.upstream, size.downstream)
             all.tfs <- union(all.tfs, new.tfs)
         }
@@ -491,8 +516,8 @@ getTfsFromMultiDB <- function(gene.list, genome.db.uri, projectList,
                                  genome.db.uri = genome.db.uri,
                                  projectList = projectList,
                                  size.upstream = size.upstream,
-                                 size.downstream = size.downstream,
-                                 sampleIDs = sampleIDs)
+                                 size.downstream = size.downstream
+                                 )
     
     # Name the list after the genes supplied
     names(full.result.list) <- gene.list
@@ -505,19 +530,24 @@ getTfsFromMultiDB <- function(gene.list, genome.db.uri, projectList,
 
 # Also assume this has 128 cores!!
 # Step 1: Get all the genes
-all.genes <- getTfsFromMultiDB(rownames(my.mtx),
-                               genome.db.uri = "postgres://localhost/hg38",
-                               projectList = c("postgres://localhost/brain_hint_20",
-                                               "postgres://localhost/brain_hint_16",
-                                               "postgres://localhost/brain_wellington_20",
-                                               "postgres://localhost/brain_wellington_16"),
-                               size.upstream = 5000,
-                               size.downstream = 5000,
-                               num.cores = 100)
 
-# Step 2: Use all the genes to make ALL the models
-all.models <- createModelFromGeneList(my.mtx, all.genes, num.cores = 30,
-                                      solverList = c("lasso","ridge","pearson",
-                                                     "spearman","randomforest",
-                                                     "lassopv","sqrtlasso"),
-                                      nCores.sqrt = 4)
+testRun <- function(my.mtx){
+
+    all.genes <- getTfsFromMultiDB(rownames(my.mtx),
+                                   genome.db.uri = "postgres://localhost/hg38",
+                                   projectList = c("postgres://localhost/brain_hint_20",
+                                                   "postgres://localhost/brain_hint_16",
+                                                   "postgres://localhost/brain_wellington_20",
+                                                   "postgres://localhost/brain_wellington_16"),
+                                   size.upstream = 5000,
+                                   size.downstream = 5000,
+                                   num.cores = 100)
+    
+    # Step 2: Use all the genes to make ALL the models
+    all.models <- createModelFromGeneList(my.mtx, all.genes, num.cores = 30,
+                                          solverList = c("lasso","ridge","pearson",
+                                                         "spearman","randomforest",
+                                                         "lassopv","sqrtlasso"),
+                                          nCores.sqrt = 4)
+}
+#----------------------------------------------------------------------------------------------------
