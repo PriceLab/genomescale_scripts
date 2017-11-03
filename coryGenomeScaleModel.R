@@ -68,31 +68,67 @@ createGenomeScaleModel <- function(mtx.assay,
 
 } # createGenomeScaleModel
 #----------------------------------------------------------------------------------------------------
-getTfsFromDb <- function(gene.list, genome.db.uri, project.db.uri,
-                       size.upstream=1000, size.downstream=1000, num.cores = 8){
+# Note: Run this on a dataframe of regions, including gene names (geneSymbol column)
+getTfsFromDb <- function(regions, genome.db.uri, project.db.uri,
+                       size.upstream=5000, size.downstream=5000, num.cores = 8){
 
     # Setup the parallel structure with a default of half the cores
-    if(is.null(num.cores)){
-        num.cores <- detectCores()/2}
+#    if(is.null(num.cores)){
+#        num.cores <- detectCores()/2}
 
     # Use BiocParallel    
     register(MulticoreParam(workers = num.cores,
-    #register(SerialParam(    
+#    register(SerialParam(    
 
                             stop.on.error = FALSE,                            
                             log = TRUE),
              default = TRUE)
 
-    findGeneFootprints <- function(target.gene, genome.db.uri, project.db.uri,
-                                   size.upstream, size.downstream){
+    # Transform the given regions into a list of region dataframes
+    regions.wo.genes <- select(regions, -geneSymbol)
 
-        # Use the target gene to get the correct regions
-        trena <- Trena("hg38")
-        regions <- getProximalPromoter(trena, target.gene, size.upstream, size.downstream)
-
-        # Check if there IS a proximal promoter; if not, return "No proximal promoter"
-        if(is.na(regions)) return("No promoter found")
+    # Make the dataframe into a list of dataframes
+    dfToList <- function(regions){
+        df.list <- list()
+        for(i in 1:floor(nrow(regions)/10)){
+            idx1 <- 10*i-9
+            idx2 <- 10*i
+            df.list[[i]] <- regions[idx1:idx2,]
+        }
         
+        if(nrow(regions) %% 10 != 0){
+            i <- floor(nrow(regions)/10)
+            idx1 <- 10*i+1
+            idx2 <- nrow(regions)
+            df.list[[i+1]] <- regions[idx1:idx2,]
+        }
+        
+        return(df.list)
+    }    
+
+    regions.list <- dfToList(regions)
+    
+    # Function to convert motifs to tfs
+    convertMotifsToTfs <- function(motifs){
+
+        # Catch footprints that don't exist
+        if(is.character(motifs)) return(NA)
+        tf.df <- motifsgenes %>%
+            filter(motif %in% motifs$motifName)
+        return(unique(tf.df$tf))                
+    }
+
+    selectOrNA <- function(output){
+        # If it's a dataframe, return the motifName column
+        if(is.character(output)){
+            return(output)
+        } else if(nrow(output) == 0){
+            return("No footprints found")}        
+        return(select(output, motifName))
+    }
+                
+    findGeneFootprints <- function(regions, genome.db.uri, project.db.uri){
+       
         # Create the footprint filter from the target gene
         footprint.filter <- try(FootprintFilter(genomeDB = genome.db.uri,
                                                 footprintDB = project.db.uri,
@@ -103,15 +139,16 @@ getTfsFromDb <- function(gene.list, genome.db.uri, project.db.uri,
         if(class(footprint.filter) == "FootprintFilter"){
             out.list <- getCandidates(footprint.filter)
 
-            # Catch empty data frames
-            if(nrow(out.list) == 0) return(character(0))
+            # Catch empty lists
+            if(length(out.list) == 0) return(character(0))
 
             # Only return TFs if candidate grab is not null
             if(class(out.list) != "NULL"){
                 # Use a semi join to grab the correct tfs
-                tf.df <- motifsgenes %>%
-                    semi_join(out.list, by = c("motif" = "motifName"))
-                return(unique(tf.df$tf))
+                motif.list <- lapply(out.list, selectOrNA)
+                tf.list <- lapply(motif.list, convertMotifsToTfs)
+
+                return(tf.list)
 
             } else {
                 return("No Candidates Found")
@@ -121,14 +158,18 @@ getTfsFromDb <- function(gene.list, genome.db.uri, project.db.uri,
             }
     }    
 
-    full.result.list <- bplapply(gene.list, findGeneFootprints,
+    full.result.list <- bplapply(regions.list, findGeneFootprints,
                                  genome.db.uri = genome.db.uri,
-                                 project.db.uri = project.db.uri,
-                                 size.upstream = size.upstream,
-                                 size.downstream = size.downstream)
+                                 project.db.uri = project.db.uri)
     
-    # Name the list after the genes supplied
-    names(full.result.list) <- gene.list
+    # Un-nest and Name the list after the genes supplied
+    full.result.list <- unlist(full.result.list, recursive = FALSE)    
+    names(full.result.list) <- regions$geneSymbol
+
+    # Remove any where the content is wrong
+    no.fp <- which(!(sapply(full.result.list, is.character)))
+    full.result.list[no.fp] <- NULL
+    
     return(full.result.list)
 
 } # getTfsFromDb
@@ -443,12 +484,113 @@ getTfsFromSampleIDsMultiDB <- function(gene.list, sampleIDs, genome.db.uri, proj
 
 } # getTfsFromSampleIDsMultiDB
 #----------------------------------------------------------------------------------------------------
-getTfsFromMultiDB <- function(gene.list, genome.db.uri, projectList,
-                                size.upstream=1000, size.downstream=1000, num.cores = 8){
+# Note: Run this on a dataframe of regions, including gene names (geneSymbol column)
+getTfsFromMultiDB <- function(regions, genome.db.uri, projectList,num.cores = 8){
+        
+    # Make the dataframe into a list of dataframes
+    dfToList <- function(regions){
+        df.list <- list()
+        for(i in 1:floor(nrow(regions)/10)){
+            idx1 <- 10*i-9
+            idx2 <- 10*i
+            df.list[[i]] <- regions[idx1:idx2,]
+        }
+        
+        if(nrow(regions) %% 10 != 0){
+            i <- floor(nrow(regions)/10)
+            idx1 <- 10*i+1
+            idx2 <- nrow(regions)
+            df.list[[i+1]] <- regions[idx1:idx2,]
+        }
+        
+        return(df.list)
+    }    
 
-    # Setup the parallel structure with a default of half the cores
-    if(is.null(num.cores)){
-        num.cores <- detectCores()/2}
+    regions.list <- dfToList(regions)
+    
+    # Function to convert motifs to tfs
+    convertMotifsToTfs <- function(motifs){
+
+        # Catch footprints that don't exist
+        if(is.character(motifs)) return(NA)
+        tf.df <- motifsgenes %>%
+            filter(motif %in% motifs$motifName)
+        return(unique(tf.df$tf))                
+    }
+
+    selectOrNA <- function(output){
+        # If it's a dataframe, return the motifName column
+        if(is.character(output)){
+            return(output)
+        } else if(nrow(output) == 0){
+            return("No footprints found")}        
+        return(select(output, motifName))
+    }
+                
+    findGeneFootprints <- function(regions, genome.db.uri, project.db.uri){
+       
+        # Create the footprint filter from the target gene
+        footprint.filter <- try(FootprintFilter(genomeDB = genome.db.uri,
+                                                footprintDB = project.db.uri,
+                                                regions = regions),                                
+                                silent = TRUE)        
+
+        # Only grab candidates if the filter is valid
+        if(class(footprint.filter) == "FootprintFilter"){
+            out.list <- getCandidates(footprint.filter)
+
+            # Catch empty lists
+            if(length(out.list) == 0) return(character(0))
+
+            # Only return TFs if candidate grab is not null
+            if(class(out.list) != "NULL"){
+                # Use a semi join to grab the correct tfs
+                motif.list <- lapply(out.list, selectOrNA)
+                tf.list <- lapply(motif.list, convertMotifsToTfs)
+
+                return(tf.list)
+
+            } else {
+                return("No Candidates Found")
+                }                
+        } else{            
+            return(footprint.filter[1])
+            }
+    }    
+    
+    # Define a function that loops through a list and accumulates TF lists
+    combineTFsFromDBs <- function(regions, genome.db.uri, projectList){
+
+        # Take in the regions DF with gene symbol and pull it off
+        regions.wo.genes <- select(regions, -geneSymbol)        
+
+        # Find the first set of footprints
+        all.tfs <- findGeneFootprints(regions.wo.genes,
+                                      genome.db.uri,
+                                      projectList[1])
+
+        # Name the list after the genes supplied        
+        names(all.tfs) <- regions$geneSymbol
+
+        # Find Footprints from each DB and add to list
+        for(i in 1:length( projectList)){
+            new.tfs <- findGeneFootprints(regions.wo.genes,
+                                          genome.db.uri,
+                                          projectList[i])
+
+            # Name and un-nest the TFs as before          
+            names(new.tfs) <- regions$geneSymbol
+
+            # Consolidate the 2 lists
+            keys <- names(all.tfs)
+            all.tfs <- setNames(mapply(union,
+                                       all.tfs[keys],
+                                       new.tfs[keys]),
+                                keys)
+        }
+        # Return the full list
+        return(all.tfs)
+    }        
 
     # Use BiocParallel    
     register(MulticoreParam(workers = num.cores,
@@ -456,73 +598,18 @@ getTfsFromMultiDB <- function(gene.list, genome.db.uri, projectList,
                             log = TRUE),
              default = TRUE)
 
-    findGeneFootprints <- function(regions, genome.db.uri, project.db.uri,
-                                   size.upstream, size.downstream){
-                
-        # Create the footprint filter from the target gene
-        footprint.filter <- try(FootprintFilter(genomeDB = genome.db.uri,
-                                                footprintDB = project.db.uri,
-                                                regions = regions),                                
-                                silent = TRUE)        
-        
-        # Only grab candidates if the filter is valid
-        if(class(footprint.filter) == "FootprintFilter"){
-            out.list <- getCandidates(footprint.filter)
-            
-            # Only return TFs if candidate grab is not null
-            if(class(out.list) != "NULL"){
-
-                # Catch empty data frames
-                if(nrow(out.list) == 0) return(character(0))
-                # Use a semi join to grab the correct tfs
-                tf.df <- motifsgenes %>%
-                    semi_join(out.list, by = c("motif" = "motifName"))
-                return(unique(tf.df$tf))                
-            } else {
-                return("No Candidates Found")
-            }                
-        } else{            
-            return(footprint.filter[1])
-        }
-    }    
-
-    # Define a function that loops through a list and accumulates TF lists
-    combineTFsFromDBs <- function(target.gene, genome.db.uri, projectList,
-                                  size.upstream, size.downstream){
-
-        # Look for the regions first
-        trena <- Trena("hg38")
-        regions <- getProximalPromoter(trena, target.gene, size.upstream, size.downstream)
-        
-        # Check if there IS a proximal promoter; if not, return "No proximal promoter"
-        # By doing this here, we're saving time!
-        if(is.na(regions)) return("No promoter found")
-
-        # Create an empty vector
-        all.tfs <- character(0)
-
-        # Find Footprints from each DB and add to list
-        for(project.db.uri in projectList){
-            new.tfs <- findGeneFootprints(regions, genome.db.uri, project.db.uri,
-                                          size.upstream, size.downstream)
-            all.tfs <- union(all.tfs, new.tfs)
-        }
-        # Return the full list
-        return(all.tfs)
-    }        
-    
-    # This part should remain the same
-    full.result.list <- bplapply(gene.list, combineTFsFromDBs,
+    full.result.list <- bplapply(regions.list, combineTFsFromDBs,
                                  genome.db.uri = genome.db.uri,
-                                 projectList = projectList,
-                                 size.upstream = size.upstream,
-                                 size.downstream = size.downstream
-                                 )
-    
-    # Name the list after the genes supplied
-    names(full.result.list) <- gene.list
-    return(full.result.list)
+                                 projectList = projectList)
 
+    # Un-nest the list
+    full.result.list <- unlist(full.result.list, recursive = FALSE)
+    
+    # Remove any where the content is wrong
+    no.fp <- which(!(sapply(full.result.list, is.character)))
+    full.result.list[no.fp] <- NULL
+    return(full.result.list)
+    
 } # getTfsFromSampleIDsMultiDB
 #----------------------------------------------------------------------------------------------------
 # Example Cory Script
@@ -596,3 +683,26 @@ getProxProbesPromoter <- function(probeIDs,
 
           }
 
+#----------------------------------------------------------------------------------------------------
+# How to call it; a sample function
+sampleCall <- function(regions){
+
+    # Assume we've got a set of regions...
+    genome.db.uri <- "postgres://localhost/hg38"
+    projectList <- c("postgres://localhost/brain_hint_20",
+                     "postgres://localhost/brain_hint_16",
+                     "postgres://localhost/brain_wellington_20",
+                     "postgres://localhost/brain_wellington_16")
+
+    # Call using 30 cores
+    all.candidates <- getTfsFromMultiDB(regions, genome.db.uri, projectList, 30)
+
+} #sampleCall
+
+# For Cory: assuming you've called your file "my.regions"
+# my.stuff <- sampleCall(my.regions)
+
+    
+
+
+ 
