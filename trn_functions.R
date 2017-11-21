@@ -40,18 +40,29 @@ pullGeneAndRank <- function(my.gene,df){
 
 #----------------------------------------------------------------------------
 # function that takes a list of genes to see what TFs are top regulators
-tfEnrich <- function(trn, gene.list)
+tfEnrich <- function(trn, gene.list, limit)
 {
 df.list <- lapply(gene.list, pullGeneAndRank, trn)
-all.df <- rbindlist(df.list)
+all.df <- rbindlist(df.list) %>% filter(rank <= limit)
+input.length <- length(gene.list)
+genes_in_trn <- length(which(lapply(df.list, nrow) > 1))
+
+all.df$input_list_length <- rep(input.length)
+all.df$found_in_trn <- rep(genes_in_trn)
 
 # Create summary statistics
 final.df <- all.df %>% group_by(gene) %>%
 summarise(frequency = n(), avg.rank = mean(rank), sd.rank = sd(rank),
 top.rank = min(rank), bot.rank = max(rank)) %>%
 arrange(desc(frequency),avg.rank)
+
 final.df <- as.data.frame(final.df)
+final.df$input_list_length <- rep(input.length)
+final.df$found_in_trn <- rep(genes_in_trn)
+
+
 arrange(head(final.df, 50), avg.rank)
+
 }
 
 #----------------------------------------------------------------------------
