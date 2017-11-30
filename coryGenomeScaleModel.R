@@ -4,7 +4,7 @@ library(RPostgreSQL)
 library(dplyr)
 #----------------------------------------------------------------------------------------------------
 # Bring in the TF-motif mapping
-motifsgenes <- readRDS("./2017_10_26_Motif_TF_Map.RDS")
+motifsgenes <- readRDS("/ssd/cory/github/genomescale_scripts/2017_10_26_Motif_TF_Map.RDS")
 #----------------------------------------------------------------------------------------------------
 createGenomeScaleModel <- function(mtx.assay,
                                    gene.list,
@@ -85,7 +85,7 @@ getTfsFromDb <- function(regions, genome.db.uri, project.db.uri,
              default = TRUE)
 
     # Transform the given regions into a list of region dataframes
-    regions.wo.genes <- select(regions, -geneSymbol)
+    regions.wo.genes <- dplyr::select(regions, -geneSymbol)
 
     # Make the dataframe into a list of dataframes
     dfToList <- function(regions){
@@ -124,7 +124,7 @@ getTfsFromDb <- function(regions, genome.db.uri, project.db.uri,
             return(output)
         } else if(nrow(output) == 0){
             return("No footprints found")}        
-        return(select(output, motifName))
+        return(dplyr::select(output, motifName))
     }
                 
     findGeneFootprints <- function(regions, genome.db.uri, project.db.uri){
@@ -524,7 +524,7 @@ getTfsFromMultiDB <- function(regions, genome.db.uri, projectList,num.cores = 8)
             return(output)
         } else if(nrow(output) == 0){
             return("No footprints found")}        
-        return(select(output, motifName))
+        return(dplyr::select(output, motifName))
     }
                 
     findGeneFootprints <- function(regions, genome.db.uri, project.db.uri){
@@ -538,13 +538,23 @@ getTfsFromMultiDB <- function(regions, genome.db.uri, projectList,num.cores = 8)
         # Only grab candidates if the filter is valid
         if(class(footprint.filter) == "FootprintFilter"){
             out.list <- getCandidates(footprint.filter)
+	    
+	    # filter footprints based on score
+	    if(grepl("hint", project.db.uri)){
+	    
+	    # the number 200 was chosen based on it filtering out ~ 2/3 of the hits
+	    out.list <- lapply(out.list, filter, score1 >= 200)
+	    }
+	    else if(grepl("wellington", project.db.uri)){
 
+	    # the number -10 was chosen based on it filtering out ~1/3 of the hits (because wellington is more conservative to begin with)
+	    out.list <- lapply(out.list, filter, score1 <= -15)
+	    }
             # Catch empty lists
             if(length(out.list) == 0) return(character(0))
 
             # Only return TFs if candidate grab is not null
             if(class(out.list) != "NULL"){
-                # Use a semi join to grab the correct tfs
                 motif.list <- lapply(out.list, selectOrNA)
                 tf.list <- lapply(motif.list, convertMotifsToTfs)
 
@@ -562,7 +572,7 @@ getTfsFromMultiDB <- function(regions, genome.db.uri, projectList,num.cores = 8)
     combineTFsFromDBs <- function(regions, genome.db.uri, projectList){
 
         # Take in the regions DF with gene symbol and pull it off
-        regions.wo.genes <- select(regions, -geneSymbol)        
+        regions.wo.genes <- dplyr::select(regions, -geneSymbol)        
 
         # Find the first set of footprints
         all.tfs <- findGeneFootprints(regions.wo.genes,
@@ -571,6 +581,9 @@ getTfsFromMultiDB <- function(regions, genome.db.uri, projectList,num.cores = 8)
 
         # Name the list after the genes supplied        
         names(all.tfs) <- regions$geneSymbol
+	
+	# collapse multiple entries for the same gene
+	all.tfs <- sapply(unique(names(all.tfs)), function(x) unique(unlist(all.tfs[names(all.tfs) == x], use.names = FALSE)), simplify = FALSE)
 
         # Find Footprints from each DB and add to list
         for(i in 1:length( projectList)){
@@ -580,7 +593,10 @@ getTfsFromMultiDB <- function(regions, genome.db.uri, projectList,num.cores = 8)
 
             # Name and un-nest the TFs as before          
             names(new.tfs) <- regions$geneSymbol
-
+	    
+	    # collapse multiple entries for the same gene
+            new.tfs <- sapply(unique(names(new.tfs)), function(x) unique(unlist(new.tfs[names(new.tfs) == x], use.names = FALSE)), simplify = FALSE)
+	    
             # Consolidate the 2 lists
             keys <- names(all.tfs)
             all.tfs <- setNames(mapply(union,
@@ -608,6 +624,10 @@ getTfsFromMultiDB <- function(regions, genome.db.uri, projectList,num.cores = 8)
     # Remove any where the content is wrong
     no.fp <- which(!(sapply(full.result.list, is.character)))
     full.result.list[no.fp] <- NULL
+
+    # To accomodate genes with multiple regions, include this step that combines regions with the same name
+    #full.result.list <- sapply(unique(names(full.result.list)), function(x) unique(unlist(full.result.list[names(full.result.list) == x], use.names = FALSE)), simplify = FALSE)
+
     return(full.result.list)
     
 } # getTfsFromSampleIDsMultiDB
