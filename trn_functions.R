@@ -25,7 +25,7 @@ getTF <- function(trn, geneA)
 # give a rank of each TF for the target gene
 trnTFRank <- function(trn)
 {
-trn <- data.frame(trn %>% group_by(target.gene) %>% mutate(Rank = rank(-pcaMax)))
+  trn <- data.frame(trn %>% dplyr::group_by(target.gene) %>% dplyr::mutate(Rank = rank(-pcaMax)))
 }
 
 #----------------------------------------------------------------------------
