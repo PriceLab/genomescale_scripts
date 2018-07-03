@@ -16,6 +16,12 @@ source("symToGeneID.R"); test_assignGeneIDs()
 #---------------------------------------------------------------------------------
 # requires a list of genes
 #---------------------------------------------------------------------------------
+runTests <- function()
+{
+   test_goEnrich()
+
+} # runTests
+#---------------------------------------------------------------------------------
 goEnrich <- function(geneSymbols)
 {
   symbol.entrez.map <- assignGeneIDs(geneSymbols)
@@ -37,7 +43,7 @@ goEnrich <- function(geneSymbols)
                            keeper.geneSymbols <- unlist(keeper.geneSymbols, use.names=FALSE)
                            paste(keeper.geneSymbols, collapse=";")
                            })
-    tbl.go$genes <- geneSymbols
+    tbl.go$genes <- unlist(geneSymbols, use.names=FALSE)
     tbl.go
 
 } # goEnrich
@@ -71,6 +77,10 @@ test_goEnrich <- function()
    #geneIDs <- unlist(x$mapped, use.names=FALSE)
 
    tbl.go <- goEnrich(head(igap.ad.genes))
+   checkEquals(ncol(tbl.go), 8)
+   checkTrue(nrow(tbl.go) > 100)
+   checkEquals(tbl.go$Term[1], "negative regulation of amyloid-beta formation")
+   checkEquals(tbl.go$genes[1], "BIN1;CLU")
 
 
 } # test_goEnrich
