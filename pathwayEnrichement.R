@@ -4,6 +4,7 @@ library(GO.db)
 library(Category)
 library(org.Hs.eg.db)
 library(KEGG.db)
+library(RUnit)
 #---------------------------------------------------------------------------------
 # kegg and GO enrichment needs entrez geneIDs.  we usually start with gene sybmols
 # conversion is offered in this file:
