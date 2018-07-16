@@ -13,7 +13,7 @@ library(RUnit)
 #     mapped: successful, unique entrezIDs found for symbols
 #     multiples: quasi-successful, multiple ids found for each of these symbols
 #     failures: no entrezIDs found for these symbols
-source("https://raw.githubusercontent.com/PriceLab/genomescale_scripts/master/symToGeneID.R"); test_assignGeneIDs()
+#source("https://raw.githubusercontent.com/PriceLab/genomescale_scripts/master/symToGeneID.R"); test_assignGeneIDs()
 #---------------------------------------------------------------------------------
 # requires a list of genes
 #---------------------------------------------------------------------------------
