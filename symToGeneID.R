@@ -15,7 +15,7 @@ assignGeneIDs <- function(symbols)
 
     if(length(multiples) == 0)
         multiples <- NULL
-    
+
     unmapped <- names(which(is.na(geneIDs)))
 
 
@@ -39,9 +39,9 @@ assignGeneIDs <- function(symbols)
         geneIDs <- NULL
     if(length(multiples) == 0)
         multiples <- NULL
-    
+
     return(list(mapped=geneIDs, failures=unmapped, multiples=multiples))
-    
+
 } # assignGeneIDs
 #------------------------------------------------------------------------------------------------------------------------
 test_assignGeneIDs <- function()
@@ -63,7 +63,7 @@ test_assignGeneIDs <- function()
 
     x <- assignGeneIDs(syms.unknown)
     checkTrue(is.null(x$mapped))
-    checkEquals(x$failures, syms.unknown) 
+    checkEquals(x$failures, syms.unknown)
     checkTrue(is.null(x$multiples))
 
     x <- assignGeneIDs(syms.multipleInSYMBOL2EG)
@@ -71,7 +71,7 @@ test_assignGeneIDs <- function()
     checkTrue(all(sapply(x$mapped, length) > 1))
     checkTrue(is.null(x$failures))
     checkEquals(x$multiples, syms.multipleInSYMBOL2EG)
-    
+
     #x <- assignGeneIDs(syms)
     #checkEquals(x$failures, "SgK269")
     #checkEquals(x$multiples, "TEC")
@@ -86,9 +86,9 @@ test_assignGeneIDs <- function()
     syms <- c(syms.mappedOnlyInALIAS2EG, syms.unknown, syms.multipleInSYMBOL2EG)
     x <- assignGeneIDs(syms)
     checkEquals(names(x$mapped), syms)
-    checkEquals(x$failures, syms.unknown)              
+    checkEquals(x$failures, syms.unknown)
     checkEquals(x$multiples, syms.multipleInSYMBOL2EG)
-    
+
     syms <- c(syms.mappedInSYMBOL2EG,
               syms.mappedOnlyInALIAS2EG,
               syms.multipleInSYMBOL2EG,
@@ -97,15 +97,15 @@ test_assignGeneIDs <- function()
 
     x <- assignGeneIDs(syms)
     checkEquals(names(x$mapped), syms)
-    checkEquals(x$failures, syms.unknown)              
+    checkEquals(x$failures, syms.unknown)
 
     checkEquals(sort(x$multiples), sort(c(syms.multipleInSYMBOL2EG,
                                    syms.multipleInALIAS2EG)))
        # all symbols reported in multiples should indeed have
        # multiple entries in mapped
-    
+
     checkTrue(all(lapply(x$mapped[x$multiples], length) > 1))
-  
-          
+
+
 } # test_assignGeneIDs
 #------------------------------------------------------------------------------------------------------------------------
