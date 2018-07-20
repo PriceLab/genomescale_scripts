@@ -2,6 +2,7 @@
 # build a multi-gene table with all of the genehancer data
 source("getAllEnhancers.R")
 library(org.Hs.eg.db)
+library(BiocParallel)
 tbl.chrom <- as.data.frame(org.Hs.egCHR)
 genes.chrom2 <- subset(tbl.chrom, chromosome=="2")$gene_id   # 4245
 keytypes(org.Hs.eg.db)
@@ -11,8 +12,13 @@ keytypes(org.Hs.eg.db)
 # [19] "PFAM"         "PMID"         "PROSITE"      "REFSEQ"       "SYMBOL"       "UCSCKG"
 # [25] "UNIGENE"      "UNIPROT"
 geneSyms.chrom2 <- select(org.Hs.eg.db, keys=genes.chrom2, keytype="ENTREZID", columns="SYMBOL")$SYMBOL  # 4245
-x <- lapply(geneSyms.chrom2, getAllEnhancers)
-head(genes.chrom2)
+length(geneSyms.chrom2)
+x <- bplapply(geneSyms.chrom2, getAllEnhancers)
+tbl.enhancers.chr2 <- do.call(rbind, x)
+dim(tbl.enhancers.chr2)
+length(unique(tbl.enhancers.chr2$geneSymbol))
+save(tbl.enhancers.chr2, file="tbl.enhancer.chr2.RData")
+
 
 
 

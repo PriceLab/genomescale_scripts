@@ -1,9 +1,9 @@
 if(!exists("tbl.geneScoresAll")){
-   f <- "~/s/data/public/GeneHancer/v4.7/enhancer_gene_scores.txt"
+   f <- "enhancer_gene_scores.txt"
    tbl.geneScoresAll <- read.table(f, sep="\t", as.is=TRUE, header=TRUE)  #  934287      9
    }
 if(!exists("tbl.locsAll")){
-   f <- "~/s/data/public/GeneHancer/v4.7/enhancer_elite_ids.txt"
+   f <- "enhancer_elite_ids.txt"
    tbl.locsAll <- read.table(f, sep="\t", as.is=TRUE, header=TRUE)        #  243281      6
    }
 
