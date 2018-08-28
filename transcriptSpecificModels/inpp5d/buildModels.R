@@ -3,7 +3,7 @@
 library(trenaSGM)
 #------------------------------------------------------------------------------------------------------------------------
 load("ratio.202.RData")  # ratio.202
-load("../shinyApp/data/mtx.withDimers.cer.ros.tcx.RData")   # mtx.cer, mts.ros, mtx.tcx
+load("mtx.withDimers.cer.ros.tcx.RData")   # mtx.cer, mts.ros, mtx.tcx
 #------------------------------------------------------------------------------------------------------------------------
 genome <- "hg38"
 targetGene <- "INPP5D"
@@ -69,6 +69,8 @@ default.model <- function()
    checkEqualsNumeric(mtx.tcx.trimmed.transcript.2["INPP5D", names(max.ratio)], -0.0363866, tol=1e-6)
 
    spec.1 <- spec.0
+   spec.2 <- spec.0
+
    spec.1$matrix <- mtx.tcx.trimmed.transcript.1
    spec.2$matrix <- mtx.tcx.trimmed.transcript.2
 
