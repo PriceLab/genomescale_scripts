@@ -21,6 +21,6 @@ dim(tbl.ov)
 head(tbl.ov)
 
   # find all the genes with enhancers containing snp # 2
-tbl.snps[2,]
+tbl.snps.20[2,]
 tbl.enhancers[subset(tbl.ov, snp==2)$enhancer,]
 
