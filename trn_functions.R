@@ -66,6 +66,42 @@ arrange(head(final.df, 50), avg.rank)
 }
 
 #----------------------------------------------------------------------------
+# modified a couple functions so that the output includes the target genes for the TFs
+# and the input is ensemble ids instead of gene symbols (output is still gene symbols
+pullGeneAndRankE <- function(my.gene,df){
+  
+  df %>% filter(target.ensg == my.gene) %>%
+    mutate(rank = rank(-rfScore)) %>%
+    dplyr::select(tf.symbol, rank, target.symbol)
+}
+
+tfEnrichEns <- function(trn, gene.list, limit)
+{
+  df.list <- lapply(gene.list, pullGeneAndRankE, trn)
+  all.df <- rbindlist(df.list) %>% filter(rank <= limit)
+  input.length <- length(gene.list)
+  genes_in_trn <- length(which(lapply(df.list, nrow) > 1))
+  
+  all.df$input_list_length <- rep(input.length)
+  all.df$found_in_trn <- rep(genes_in_trn)
+  
+  # Create summary statistics
+  final.df <- all.df %>% group_by(tf.symbol) %>%
+    summarise(frequency = n(), avg.rank = mean(rank), sd.rank = sd(rank),
+              top.rank = min(rank), bot.rank = max(rank), target.symbol = paste(target.symbol,collapse='|')) %>%
+    arrange(desc(frequency),avg.rank)
+  
+  final.df <- as.data.frame(final.df)
+  final.df$input_list_length <- rep(input.length)
+  final.df$found_in_trn <- rep(genes_in_trn)
+  
+  
+  arrange(head(final.df, 50), avg.rank)
+  
+}
+
+
+#----------------------------------------------------------------------------
 # load the data
 #skin <- readRDS("primary.trn.rds")
 #fibro <- readRDS("fibroblast.trn.rds")
