@@ -1,0 +1,49 @@
+<div style="margin: 30px; margin-right: 200px;">
+Bob Rostomily and Andrei Mikheev ran ChiP-SEQ with antibodies for four
+TWIST1 variants.  Two are included in this prototype webapp:
+TWTW and TWE12.  
+
+<p>
+This webapp - perhaps - offers some insight into TWIST1-related regulatory
+mechanisms of each of the included differentially expressed genes.  It
+could be expanded if actual insight is obtained using its approach.
+
+<p>
+  
+I called peaks on the bigwig files supplied by Andrei, using MACS2
+with default settings.  
+
+<p>
+
+  The Rostomily lab also measured differential expression with RNA-seq.
+  Here we offer the top twenty positively differentially expressed genes, from a
+comparison of TwE12 vs control.
+
+<p>
+
+In addition to the gene model track, five other tracks are calculated for
+each selected gene, in which the track extends up- and downstream of the
+gene using the boundaries of the full region reported for that gene by GeneHancer.
+
+<p>
+
+<ol>
+  <li> <b>GH</b>:  "elite" promoters and enhancers for the selected gene
+  <li> <b>TWE12</b>: ChIP for this dimer
+  <li> <b>TWTW</b>: ChIP for this dimer
+  <li> <b>TWE12.gh</b>: ChIP intersected with GH
+  <li> <b>TWTW.gh</b>: ChIP intersected with GH
+</ol>
+
+<p>
+
+Tissue and/or cell-type specific annotation of the GeneHancer regions
+could, with a little work, be made available.  "non-elite" but still
+possibly intereting genehancer regions could be included.
+
+<p>
+    
+See <a href="https://www.ncbi.nlm.nih.gov/pmc/articles/PMC5467550/">here</a>
+for more infomration on GeneHancer.
+
+</div>
