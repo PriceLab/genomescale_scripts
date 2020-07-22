@@ -1,6 +1,7 @@
 FROM lc_app_upper_base_04jul2020
 WORKDIR /home/shiny
 COPY webapp.R .
+COPY intro.html .
 COPY tbl.twE12.deg.RData .
 COPY twe12.bed .
 COPY twtw.bed .
