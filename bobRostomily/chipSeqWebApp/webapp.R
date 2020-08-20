@@ -21,6 +21,8 @@ tbl.peaks.twe12 <- read.table("twe12.bed", sep="\t", skip=1, header=FALSE, as.is
 tbl.peaks.twtw <- read.table("twtw.bed", sep="\t", skip=1, header=FALSE, as.is=TRUE)[, c(1,2,3,5)]
 colnames(tbl.peaks.twe12) <- c("chrom", "start", "end", "score")
 colnames(tbl.peaks.twtw) <- c("chrom", "start", "end", "score")
+
+tbls.deg <- get(load("degGenes.RData"))
 #----------------------------------------------------------------------------------------------------
 ui <- fluidPage(
 
@@ -77,23 +79,29 @@ server <- function(session, input, output) {
              loadBedGraphTrack(session, "TWE12", tbl.sub.twe12, autoscale=TRUE, color="random")
              loadBedGraphTrack(session, "TWTW", tbl.sub.twtw, autoscale=TRUE, color="random")
 
-             gr.gh <- GRanges(tbl.gh)
-             gr.twe12 <- GRanges(tbl.sub.twe12)
-             gr.twtw <- GRanges(tbl.sub.twtw)
-             tbl.ov.twe12 <- as.data.frame(findOverlaps(gr.twe12, gr.gh))
-             tbl.ov.twtw <- as.data.frame(findOverlaps(gr.twtw, gr.gh))
-
-             tbl.twe12.gh <- tbl.sub.twe12[unique(tbl.ov.twe12[, 1]),]
-             loadBedGraphTrack(session, "TWE12.gh", tbl.twe12.gh, autoscale=TRUE, color="random")
-
-             tbl.twtw.gh <- tbl.sub.twtw[unique(tbl.ov.twtw[, 1]),]
-             loadBedGraphTrack(session, "TWTW.gh", tbl.twtw.gh, autoscale=TRUE, color="random")
-             }
+             tbls.deg <- lapply(tbls, function(tbl) subset(tbl, GeneName==selectedGene))
+             track.names <- names(tbls)[unlist(lapply(tbls.deg, function(tbl.deg) nrow(tbl.deg) > 0), use.names=FALSE)]
+             tbl.deg <- do.call(rbind, tbls.deg)
+             if(nrow(tbl.deg) > 0){
+               chrom.gene <- tbl.deg$Chrom[1]
+               chrom.start <- tbl.deg$Start[1]
+               chrom.end <- tbl.deg$End[1]
+               for(r in seq_len(nrow(tbl.deg))){
+                 track.name <- sprintf("%s-RNA", track.names[r])
+                 track.score <- tbl.deg$log2FoldChange[r]
+                 tbl.graph <- data.frame(chrom=chrom.gene, start=chrom.start, end=chrom.end, score=track.score, stringsAsFactors=FALSE)
+                 track.color <- "red"
+                 if(track.score < 0) track.color <- "green"
+                 loadBedGraphTrack(session, track.name, tbl.graph, autoscale=FALSE, min=-5, max=5, color=track.color)
+                 } # for r
+               } # if nrow(tbl.deg)
+         } # else
          } # if legit selectedGene
       })
 
 
 } # server
 #----------------------------------------------------------------------------------------------------
-runApp(shinyApp(ui, server), host="0.0.0.0", port=3838)
+#runApp(shinyApp(ui, server), host="0.0.0.0", port=3838)
+shinyApp(ui, server)
 
